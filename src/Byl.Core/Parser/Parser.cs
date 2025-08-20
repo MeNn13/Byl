@@ -1,6 +1,8 @@
 ﻿using Byl.Core.AST.Nodes;
+using Byl.Core.AST.Nodes.Declaration;
 using Byl.Core.Lexer;
 using Byl.Core.Parser.Parsers;
+using Byl.Core.Parser.Parsers.Declaration;
 using Byl.Core.Parser.Utils;
 
 namespace Byl.Core.Parser;
@@ -26,22 +28,45 @@ public class Parser
 
         while (Current.Type is not TokenType.EOF)
         {
-            if (IsTypeToken(Current.Type) || Current.Type is TokenType.Main)
-            {
-                var function = new FunctionParser(this).Parse();
-
-                if (function.Name == "главный")
-                    program.AddFunction(function);
-                else
-                    program.AddFunction(function);
-            }
-            else
-            {
-                throw UnexpectedToken(Current);
-            }
+            var declaration = ParseDeclaration();
+            program.AddDeclaration(declaration);
         }
 
         return program;
+    }
+    private DeclarationNode ParseDeclaration()
+    {
+        if (Match(TokenType.Namespace))
+            return new NamespaceParser(this).Parse();
+
+        if (Match(TokenType.Import))
+            return new ImportParser(this).Parse();
+
+        if (Match(TokenType.Static)) // Добавляем поддержку static
+            return ParseStaticFunction();
+
+        if (IsTypeToken(Current.Type) || Match(TokenType.Main, TokenType.Function))
+            return new FunctionParser(this).Parse();
+
+        throw UnexpectedToken(Current);
+    }
+
+    private FunctionDeclaration ParseStaticFunction()
+    {
+        var staticToken = Advance(); // Пропускаем 'static'
+
+        // Парсим остальную часть функции как обычную функцию
+        var function = new FunctionParser(this).Parse();
+
+        // Устанавливаем флаг static
+        return new FunctionDeclaration(
+            function.IsStatic,
+            function.ReturnType,
+            function.Name,
+            function.Parameters,
+            function.Body,
+            staticToken.Line
+        );
     }
 
     internal bool Match(params TokenType[] types)

@@ -2,10 +2,10 @@
 
 public class VariableSymbol : Symbol
 {
-    public string Type { get; } // "int", "string" и т.д.
+    public string Type { get; }
 
     public VariableSymbol(string name, string type, int line)
-        : base(name, line)
+        : base(name, "переменная", line) // Добавляем kind
     {
         Type = type;
     }

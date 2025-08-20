@@ -4,17 +4,20 @@ namespace Byl.Core.AST.Nodes.Declaration;
 
 public class FunctionDeclaration : DeclarationNode
 {
+    public bool IsStatic { get; }
+    public TypeNode? ReturnType { get; }
     public string Name { get; }
     public List<ParameterNode> Parameters { get; }
     public BlockStatement Body { get; }
-    public TypeNode? ReturnType { get; }
 
-    public FunctionDeclaration(string name,
+    public FunctionDeclaration(bool isStatic,
+        TypeNode? returnType,
+        string name,
         List<ParameterNode> parameters, 
         BlockStatement body,
-        TypeNode? returnType,
         int line) : base(line)
     {
+        IsStatic = isStatic;
         Name = name;
         Parameters = parameters;
         Body = body;

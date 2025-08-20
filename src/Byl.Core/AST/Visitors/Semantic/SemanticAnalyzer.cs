@@ -10,50 +10,83 @@ namespace Byl.Core.AST.Visitors.Semantic;
 public class SemanticAnalyzer : IAstVisitor<SemanticResult>
 {
     private readonly SymbolTable _symbols = new();
+    private readonly Dictionary<string, NamespaceScope> _namespaces = new();
+    private NamespaceScope _currentNamespace = new("");
     private FunctionDeclaration? _currentFunction;
+    private readonly List<string> _imports = new();
 
     public SemanticResult Visit(ProgramNode node)
     {
-        _symbols.EnterScope(); // Глобальная область
+        _symbols.EnterScope();
 
-        var mainFunc = node.Functions.FirstOrDefault(f => f.Name == "главный");
-        if (mainFunc is null)
-            return SemanticResult.Error("Не найдена функция 'главный'");
-
-        // Добавляем все функции в глобальную область
-        foreach (var func in node.Functions)
+        // Собираем импорты
+        foreach (var declaration in node.Declarations.OfType<ImportDeclaration>())
         {
-            var funcSymbol = new FunctionSymbol(
-                func.Name,
-                func.Parameters,
-                func.ReturnType,
-                func.Line
-            );
+            _imports.Add(declaration.Namespace);
+        }
 
-            if (!_symbols.TryAddSymbol(funcSymbol))
-                return SemanticResult.Error($"Функция '{func.Name}' уже определена");
+        // Регистрируем пространства имен
+        foreach (var declaration in node.Declarations.OfType<NamespaceDeclaration>())
+        {
+            RegisterNamespace(declaration);
+        }
 
-            //Проверка функций
-            var result = func.Accept(this);
+        // Анализируем все объявления
+        foreach (var declaration in node.Declarations)
+        {
+            var result = declaration.Accept(this);
             if (!result.IsValid) return result;
         }
+
+        // Проверяем наличие главной функции
+        var mainFunc = FindFunction("главный");
+        if (mainFunc == null)
+            return SemanticResult.Error("Не найдена функция 'главный'");
 
         _symbols.ExitScope();
         return SemanticResult.Success();
     }
+    public SemanticResult Visit(NamespaceDeclaration node)
+    {
+        var oldNamespace = _currentNamespace;
+        _currentNamespace = _namespaces[node.Name];
+
+        foreach (var member in node.Members)
+        {
+            var result = member.Accept(this);
+            if (!result.IsValid) return result;
+        }
+
+        _currentNamespace = oldNamespace;
+        return SemanticResult.Success();
+    }
+    public SemanticResult Visit(ImportDeclaration node)
+    {
+        // Импорты уже обработаны в Visit(ProgramNode)
+        return SemanticResult.Success();
+    }
+    public SemanticResult Visit(ExpressionStatement node)
+    {
+        return node.Expression.Accept(this);
+    }
     public SemanticResult Visit(FunctionDeclaration node)
     {
-        _currentFunction = node;
-        _symbols.EnterScope(); // Новая область видимости для функции
+        // Регистрируем функцию в SymbolTable
+        var funcSymbol = new FunctionSymbol(node); // Передаем declaration
+        if (!_symbols.TryAddSymbol(funcSymbol))
+            return SemanticResult.Error($"Функция '{node.Name}' уже определена");
 
-        // Добавляем параметры в scope
+        _currentFunction = node;
+        _symbols.EnterScope();
+
+        // Добавляем параметры
         foreach (var param in node.Parameters)
         {
             var paramResult = param.Accept(this);
             if (!paramResult.IsValid) return paramResult;
         }
 
-        // Проверяем тело функции
+        // Проверяем тело
         var bodyResult = node.Body.Accept(this);
 
         _symbols.ExitScope();
@@ -158,11 +191,25 @@ public class SemanticAnalyzer : IAstVisitor<SemanticResult>
     }
     public SemanticResult Visit(VariableExpression node)
     {
-        // Проверяем, объявлена ли переменная
-        if (_symbols.Lookup(node.Name) == null)
-            return SemanticResult.Error($"Неизвестная переменная '{node.Name}'");
+        // Ищем переменную в текущей области
+        var variable = _symbols.Lookup<VariableSymbol>(node.Name);
+        if (variable != null) return SemanticResult.Success();
 
-        return SemanticResult.Success();
+        // Ищем в текущем пространстве имен
+        var nsVariable = _currentNamespace.GetVariable(node.Name);
+        if (nsVariable != null) return SemanticResult.Success();
+
+        // Ищем в импортированных пространствах
+        foreach (var import in _imports)
+        {
+            if (_namespaces.TryGetValue(import, out var ns))
+            {
+                var importedVar = ns.GetVariable(node.Name);
+                if (importedVar != null) return SemanticResult.Success();
+            }
+        }
+
+        return SemanticResult.Error($"Неизвестная переменная '{node.Name}'");
     }
     public SemanticResult Visit(VariableDeclarationStatement node)
     {
@@ -263,6 +310,32 @@ public class SemanticAnalyzer : IAstVisitor<SemanticResult>
 
         return SemanticResult.Success();
     }
+    public SemanticResult Visit(FunctionCallExpression node)
+    {
+        // Ищем функцию с учетом пространств имен
+        var function = FindFunction(node.FunctionName);
+        if (function == null)
+            return SemanticResult.Error($"Неизвестная функция '{node.FunctionName}'");
+
+        // Проверяем количество аргументов
+        if (node.Arguments.Count != function.Parameters.Count)
+            return SemanticResult.Error($"Ожидалось {function.Parameters.Count} аргументов, получено {node.Arguments.Count}");
+
+        // Проверяем типы аргументов
+        for (int i = 0; i < node.Arguments.Count; i++)
+        {
+            var argResult = node.Arguments[i].Accept(this);
+            if (!argResult.IsValid) return argResult;
+
+            var argType = GetExpressionType(node.Arguments[i]);
+            var paramType = function.Parameters[i].Type.TypeName;
+
+            if (!TypeSystem.AreTypesCompatible(paramType, argType))
+                return SemanticResult.Error($"Несовместимый тип аргумента {i + 1}");
+        }
+
+        return SemanticResult.Success();
+    }
 
     private string? GetExpressionType(ExpressionNode expr) => expr switch
     {
@@ -282,7 +355,25 @@ public class SemanticAnalyzer : IAstVisitor<SemanticResult>
     };
     private string? GetVariableType(VariableExpression varExpr)
     {
-        return _symbols.Lookup<VariableSymbol>(varExpr.Name)?.Type;
+        // Ищем в текущей области
+        var variable = _symbols.Lookup<VariableSymbol>(varExpr.Name);
+        if (variable != null) return variable.Type;
+
+        // Ищем в текущем пространстве имен
+        var nsVariable = _currentNamespace.GetVariable(varExpr.Name);
+        if (nsVariable != null) return nsVariable.Type;
+
+        // Ищем в импортированных пространствах
+        foreach (var import in _imports)
+        {
+            if (_namespaces.TryGetValue(import, out var ns))
+            {
+                var importedVar = ns.GetVariable(varExpr.Name);
+                if (importedVar != null) return importedVar.Type;
+            }
+        }
+
+        return null;
     }
     private string? GetBinaryExpressionType(BinaryExpression binExpr)
     {
@@ -309,4 +400,52 @@ public class SemanticAnalyzer : IAstVisitor<SemanticResult>
             _ => rightType
         };
     }
+    private void RegisterNamespace(NamespaceDeclaration ns)
+    {
+        if (!_namespaces.ContainsKey(ns.Name))
+        {
+            _namespaces[ns.Name] = new NamespaceScope(ns.Name);
+        }
+
+        var scope = _namespaces[ns.Name];
+
+        foreach (var member in ns.Members)
+        {
+            if (member is FunctionDeclaration func)
+            {
+                scope.AddFunction(func);
+            }
+        }
+    }
+    private FunctionDeclaration? FindFunction(string name)
+    {
+        // Ищем в текущем пространстве имен
+        if (_currentNamespace.TryGetFunction(name, out var func))
+            return func;
+
+        // Ищем в импортированных пространствах
+        foreach (var import in _imports)
+        {
+            if (_namespaces.TryGetValue(import, out var ns) && ns.TryGetFunction(name, out func))
+                return func;
+        }
+
+        // Ищем в глобальной области
+        var globalFunc = _symbols.Lookup<FunctionSymbol>(name);
+        return globalFunc?.Declaration;
+
+    }
+    private T? FindInImportedNamespaces<T>(string name) where T : Symbol
+    {
+        foreach (var import in _imports)
+        {
+            if (_namespaces.TryGetValue(import, out var ns))
+            {
+                var symbol = ns.Lookup<T>(name);
+                if (symbol != null) return symbol;
+            }
+        }
+        return null;
+    }
+
 }

@@ -14,7 +14,8 @@ public class StatementParser(Parser parser)
         new IfStatementParser(parser),
         new VariableDeclarationParser(parser),
         new WhileStatementParser(parser),
-        new ReturnStatementParser(parser)
+        new ReturnStatementParser(parser),
+        new ExpressionStatementParser(parser),
        ];
 
     public BlockStatement Parse()
