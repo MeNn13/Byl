@@ -78,20 +78,19 @@ public class CodeGenerator : IAstVisitor<string>
     }
     public string Visit(FunctionDeclaration node)
     {
-        var functionName = _currentNamespacePrefix + node.Name;
-
-        // Запоминаем префикс для этой функции
-        _functionPrefixes[node.Name] = _currentNamespacePrefix;
+        var functionName = Transliterate(node.Name); // Транслитерируем имя функции
+        var fullFunctionName = _currentNamespacePrefix + functionName;
 
         var returnType = GetCType(node.ReturnType);
 
         var sb = new StringBuilder();
-        sb.Append($"{returnType} {functionName}(");
+        sb.Append($"{returnType} {fullFunctionName}(");
 
         for (int i = 0; i < node.Parameters.Count; i++)
         {
             if (i > 0) sb.Append(", ");
-            sb.Append($"{GetCType(node.Parameters[i].Type)} {node.Parameters[i].Name}");
+            var paramName = Transliterate(node.Parameters[i].Name); // Транслитерируем параметры
+            sb.Append($"{GetCType(node.Parameters[i].Type)} {paramName}");
         }
 
         sb.AppendLine(") {");
@@ -126,7 +125,8 @@ public class CodeGenerator : IAstVisitor<string>
     }
     public string Visit(AssignStatement node)
     {
-        return $"    {node.VariableName} = {node.Value.Accept(this)};\n";
+        var varName = Transliterate(node.VariableName);
+        return $"    {varName} = {node.Value.Accept(this)};\n";
     }
     public string Visit(IfStatement node)
     {
@@ -165,8 +165,9 @@ public class CodeGenerator : IAstVisitor<string>
     }
     public string Visit(VariableDeclarationStatement node)
     {
+        var varName = Transliterate(node.VariableName);
         var init = node.Initializer != null ? $" = {node.Initializer.Accept(this)}" : "";
-        return $"    int {node.VariableName}{init};\n";
+        return $"    int {varName}{init};\n";
     }
     public string Visit(BinaryExpression node)
     {
@@ -189,25 +190,24 @@ public class CodeGenerator : IAstVisitor<string>
     {
         if (node.Value is string str && str.StartsWith("%\""))
         {
-            // Это интерполированная строка - обрабатываем специально
             return ProcessInterpolatedString(str);
         }
 
-        // Для обычных строк экранируем кавычки
         if (node.Value is string regularStr)
         {
             return $"\"{EscapeString(regularStr)}\"";
         }
 
-        return node.Value.ToString()?.ToLower() ?? "0";
+        if (node.Value is bool boolVal)
+        {
+            return boolVal ? "1" : "0";
+        }
+
+        return node.Value?.ToString() ?? "0";
     }
     public string Visit(VariableExpression node)
     {
-        // Для переменных из импортированных пространств добавляем префикс
-        // В кодогенераторе мы не имеем доступа к символьной таблице,
-        // поэтому просто возвращаем имя переменной
-        // Префиксы добавляются на уровне вызовов функций
-        return node.Name;
+        return Transliterate(node.Name);
     }
     public string Visit(UnaryExpression node)
     {
@@ -315,7 +315,8 @@ public class CodeGenerator : IAstVisitor<string>
     }
     private string GenerateNamespacePrefix(string namespaceName)
     {
-        return namespaceName.Replace("::", "_") + "_";
+        var transliterated = Transliterate(namespaceName.Replace("::", "_"));
+        return transliterated + "_";
     }
     private string GetCType(TypeNode? typeNode)
     {
@@ -327,29 +328,114 @@ public class CodeGenerator : IAstVisitor<string>
             "вещ" => "float",
             "лог" => "int",
             "стр" => "char*",
+            "общ" => "int",
             _ => "int"
         };
     }
     private string GetFullFunctionName(string functionName)
     {
-        // Если это главная функция, возвращаем как есть
-        if (functionName == "главный")
-            return functionName;
+        if (functionName == "главный") return "main";
+
+        string transliteratedName = Transliterate(functionName);
 
         // Если функция определена в текущем пространстве имен
         if (_functionPrefixes.TryGetValue(functionName, out var prefix) && !string.IsNullOrEmpty(prefix))
         {
-            return prefix + functionName;
+            return prefix + transliteratedName;
         }
 
         // Ищем в импортированных пространствах
         foreach (var import in _importedNamespaces)
         {
             // Предполагаем, что импортированные функции имеют префикс
-            return import.Value + functionName;
+            return import.Value + transliteratedName;
         }
 
         // Если не нашли, возвращаем как есть (глобальная функция)
-        return functionName;
+        return transliteratedName;
+    }
+    private string Transliterate(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return text;
+
+        var result = new StringBuilder();
+
+        foreach (char c in text)
+        {
+            string transliterated = c switch
+            {
+                'а' => "a",
+                'б' => "b",
+                'в' => "v",
+                'г' => "g",
+                'д' => "d",
+                'е' => "e",
+                'ё' => "yo",
+                'ж' => "zh",
+                'з' => "z",
+                'и' => "i",
+                'й' => "y",
+                'к' => "k",
+                'л' => "l",
+                'м' => "m",
+                'н' => "n",
+                'о' => "o",
+                'п' => "p",
+                'р' => "r",
+                'с' => "s",
+                'т' => "t",
+                'у' => "u",
+                'ф' => "f",
+                'х' => "h",
+                'ц' => "ts",
+                'ч' => "ch",
+                'ш' => "sh",
+                'щ' => "sch",
+                'ъ' => "",
+                'ы' => "y",
+                'ь' => "",
+                'э' => "e",
+                'ю' => "yu",
+                'я' => "ya",
+                'А' => "A",
+                'Б' => "B",
+                'В' => "V",
+                'Г' => "G",
+                'Д' => "D",
+                'Е' => "E",
+                'Ё' => "Yo",
+                'Ж' => "Zh",
+                'З' => "Z",
+                'И' => "I",
+                'Й' => "Y",
+                'К' => "K",
+                'Л' => "L",
+                'М' => "M",
+                'Н' => "N",
+                'О' => "O",
+                'П' => "P",
+                'Р' => "R",
+                'С' => "S",
+                'Т' => "T",
+                'У' => "U",
+                'Ф' => "F",
+                'Х' => "H",
+                'Ц' => "Ts",
+                'Ч' => "Ch",
+                'Ш' => "Sh",
+                'Щ' => "Sch",
+                'Ъ' => "",
+                'Ы' => "Y",
+                'Ь' => "",
+                'Э' => "E",
+                'Ю' => "Yu",
+                'Я' => "Ya",
+                _ => c.ToString()
+            };
+
+            result.Append(transliterated);
+        }
+
+        return result.ToString();
     }
 }
