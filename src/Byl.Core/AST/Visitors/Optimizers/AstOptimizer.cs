@@ -24,18 +24,41 @@ namespace Byl.Core.AST.Visitors.Optimizers
         public Node Visit(TypeNode node) => node;
         public Node Visit(ProgramNode node)
         {
-            var optimizedFunctions = new List<FunctionDeclaration>();
-            foreach (var function in node.Functions)
+            var optimizedDeclarations = new List<DeclarationNode>();
+
+            foreach (var declaration in node.Declarations)
             {
-                var optimized = (FunctionDeclaration)function.Accept(this);
-                optimizedFunctions.Add(optimized);
+                var optimized = (DeclarationNode)declaration.Accept(this);
+                optimizedDeclarations.Add(optimized);
             }
-            return new ProgramNode(optimizedFunctions, node.Line);
+
+            return new ProgramNode(optimizedDeclarations, node.Line);
+        }
+        public Node Visit(NamespaceDeclaration node)
+        {
+            var optimizedMembers = new List<DeclarationNode>();
+            foreach (var member in node.Members)
+            {
+                var optimized = (DeclarationNode)member.Accept(this);
+                optimizedMembers.Add(optimized);
+            }
+            return new NamespaceDeclaration(node.Name, optimizedMembers, node.Line);
+        }
+        public Node Visit(ImportDeclaration node)
+        {
+            return node; // Импорты не оптимизируются
         }
         public Node Visit(FunctionDeclaration node)
         {
             var optimizedBody = (BlockStatement)node.Body.Accept(this);
-            return new FunctionDeclaration(node.Name, node.Parameters, optimizedBody, node.ReturnType, node.Line);
+            return new FunctionDeclaration(
+                node.IsStatic, // Добавляем static
+                node.ReturnType,
+                node.Name,
+                node.Parameters,
+                optimizedBody,
+                node.Line
+            );
         }
         public Node Visit(ParameterNode node) => node;
         public Node Visit(BlockStatement node)
@@ -118,6 +141,20 @@ namespace Byl.Core.AST.Visitors.Optimizers
         {
             var right = (ExpressionNode)node.Right.Accept(this);
             return ApplyOptimizations(new UnaryExpression(node.Operator, right, node.Line));
+        }
+        public Node Visit(ExpressionStatement node)
+        {
+            var optimizedExpression = (ExpressionNode)node.Expression.Accept(this);
+            return ApplyOptimizations(new ExpressionStatement(optimizedExpression, node.Line));
+        }
+        public Node Visit(FunctionCallExpression node)
+        {
+            var optimizedArguments = new List<ExpressionNode>();
+            foreach (var arg in node.Arguments)
+            {
+                optimizedArguments.Add((ExpressionNode)arg.Accept(this));
+            }
+            return ApplyOptimizations(new FunctionCallExpression(node.FunctionName, optimizedArguments, node.Line));
         }
 
         private T ApplyOptimizations<T>(T node) where T : Node

@@ -11,6 +11,14 @@ public class FunctionParser(Parser parser)
 
     public FunctionDeclaration Parse()
     {
+        // Парсим модификаторы (static)
+        bool isStatic = false;
+        if (_parser.Match(TokenType.Static))
+        {
+            isStatic = true;
+            _parser.Advance(); // Пропускаем 'static'
+        }
+
         // Парсим тип возвращаемого значения (если есть)
         TypeNode? returnType = null;
         if (_parser.IsTypeToken(_parser.Current.Type))
@@ -18,7 +26,7 @@ public class FunctionParser(Parser parser)
             returnType = ParseType();
         }
 
-        // Определяем тип функции (main или обычная)
+        // Определяем тип функции
         Token nameToken;
         if (_parser.Match(TokenType.Main))
         {
@@ -28,6 +36,11 @@ public class FunctionParser(Parser parser)
         {
             _parser.Advance(); // Пропускаем 'function'
             nameToken = _parser.Consume(TokenType.Identifier, "Ожидалось имя функции");
+        }
+        else if (_parser.Match(TokenType.Identifier))
+        {
+            // Прямое имя функции без ключевого слова 'function'
+            nameToken = _parser.Advance();
         }
         else
         {
@@ -48,10 +61,12 @@ public class FunctionParser(Parser parser)
 
         _parser.Consume(TokenType.RParen, "Ожидалось ')'");
         var body = new StatementParser(_parser).Parse();
-        return new FunctionDeclaration(nameToken.Value,
+
+        return new FunctionDeclaration(isStatic,
+            returnType,
+            nameToken.Value,
             parameters,
             body,
-            returnType,
             _parser.LastToken.Line);
     }
 

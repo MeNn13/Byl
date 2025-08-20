@@ -14,6 +14,7 @@ internal class PrintStatementParser(Parser parser) : IStatementParser
         var printToken = _parser.Advance();
         _parser.Consume(TokenType.LParen, "Ожидалось '(' после 'печать'");
 
+        // Используем ExpressionParser для парсинга всего выражения
         var expression = new ExpressionParser(_parser).Parse();
 
         _parser.Consume(TokenType.RParen, "Ожидалось ')' после выражения");

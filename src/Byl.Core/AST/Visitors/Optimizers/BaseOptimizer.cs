@@ -26,7 +26,9 @@ internal abstract class BaseOptimizer : IOptimizer
         VariableDeclarationStatement varDecl => VisitVarDecl(varDecl),
         BlockStatement block => VisitBlock(block),
         FunctionDeclaration func => VisitFunction(func),
+        FunctionCallExpression funcCall => VisitFunctionCall(funcCall),
         ProgramNode program => VisitProgram(program),
+        ExpressionStatement program => VisitExpressionStatement(program),
         _ => node
     };
 
@@ -44,4 +46,6 @@ internal abstract class BaseOptimizer : IOptimizer
     protected virtual Node VisitBlock(BlockStatement node) => node;
     protected virtual Node VisitFunction(FunctionDeclaration node) => node;
     protected virtual Node VisitProgram(ProgramNode node) => node;
+    protected virtual Node VisitFunctionCall(FunctionCallExpression node) => node;
+    protected virtual Node VisitExpressionStatement(ExpressionStatement node) => node;
 }

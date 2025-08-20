@@ -120,5 +120,15 @@ internal class ConstantFoldingOptimizer : BaseOptimizer
 
         return new UnaryExpression(node.Operator, right, node.Line);
     }
+    protected override Node VisitFunctionCall(FunctionCallExpression node)
+    {
+        var optimizedArgs = new List<ExpressionNode>();
+        foreach (var arg in node.Arguments)
+        {
+            optimizedArgs.Add((ExpressionNode)Visit(arg));
+        }
 
+        // Пока не сворачиваем вызовы функций, просто возвращаем оптимизированные аргументы
+        return new FunctionCallExpression(node.FunctionName, optimizedArgs, node.Line);
+    }
 }

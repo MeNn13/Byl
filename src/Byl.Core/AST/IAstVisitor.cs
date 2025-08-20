@@ -1,5 +1,4 @@
-﻿using System.Linq.Expressions;
-using Byl.Core.AST.Nodes;
+﻿using Byl.Core.AST.Nodes;
 using Byl.Core.AST.Nodes.Declaration;
 using Byl.Core.AST.Nodes.Expression;
 using Byl.Core.AST.Nodes.Statement;
@@ -14,6 +13,8 @@ public interface IAstVisitor<TResult>
     // Declarations
     TResult Visit(ProgramNode node);
     TResult Visit(FunctionDeclaration node);
+    TResult Visit(NamespaceDeclaration node);
+    TResult Visit(ImportDeclaration node);
     TResult Visit(ParameterNode node);
 
     // Statements
@@ -24,6 +25,7 @@ public interface IAstVisitor<TResult>
     TResult Visit(WhileStatement node);
     TResult Visit(ReturnStatement node);
     TResult Visit(VariableDeclarationStatement node);
+    TResult Visit(ExpressionStatement node);
 
     // Expressions
     TResult Visit(Nodes.Expression.BinaryExpression node);
@@ -31,4 +33,5 @@ public interface IAstVisitor<TResult>
     TResult Visit(VariableExpression node);
     TResult Visit(Nodes.Expression.UnaryExpression node);
     TResult Visit(InterpolatedStringExpression node);
+    TResult Visit(FunctionCallExpression node);
 }

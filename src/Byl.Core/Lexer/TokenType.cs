@@ -33,6 +33,35 @@ public enum TokenType
     [Keyword("вернуть")]
     [TokenMatcher(typeof(KeywordMatcher))]
     Return,
+
+    [Keyword("этот")]
+    [TokenMatcher(typeof(KeywordMatcher))]
+    This,
+
+    [Keyword("статик")]
+    [TokenMatcher(typeof(KeywordMatcher))]
+    Static,
+
+    #endregion
+
+    #region OOP
+    [Keyword("пространство")]
+    [TokenMatcher(typeof(KeywordMatcher))]
+    Namespace,
+
+    [Keyword("класс")]
+    [TokenMatcher(typeof(KeywordMatcher))]
+    Class,
+
+    [Keyword("импорт")]
+    [TokenMatcher(typeof(KeywordMatcher))]
+    Import,
+
+    [Char(':')]
+    Colon,
+
+    [MultiChar("::")]
+    NamespaceSeparator,
     #endregion
 
     #region Type
@@ -43,6 +72,10 @@ public enum TokenType
     [Keyword("цел")]
     [TokenMatcher(typeof(KeywordMatcher))]
     IntType,
+
+    [Keyword("вещ")]
+    [TokenMatcher(typeof(KeywordMatcher))]
+    FloatType,
 
     [Keyword("стр")] 
     [TokenMatcher(typeof(KeywordMatcher))]

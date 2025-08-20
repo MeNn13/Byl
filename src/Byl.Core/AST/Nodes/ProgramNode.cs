@@ -1,15 +1,13 @@
 ﻿using Byl.Core.AST.Nodes.Declaration;
 namespace Byl.Core.AST.Nodes;
-
-// Программа - корневой узел
 public class ProgramNode : Node
 {
-    private readonly List<FunctionDeclaration> _functions = [];
-    public IReadOnlyCollection<FunctionDeclaration> Functions => _functions;
+    private readonly List<DeclarationNode> _declarations = [];
+    public IReadOnlyCollection<DeclarationNode> Declarations => _declarations;
 
-    public ProgramNode(List<FunctionDeclaration> functions, int line) : base(line)
+    public ProgramNode(List<DeclarationNode> declarations, int line) : base(line)
     {
-        _functions = functions;
+        _declarations = declarations;
     }
 
     public ProgramNode() : base(0) { }
@@ -17,5 +15,5 @@ public class ProgramNode : Node
     public override TResult Accept<TResult>(IAstVisitor<TResult> visitor) =>
         visitor.Visit(this);
 
-    public void AddFunction(FunctionDeclaration function) => _functions.Add(function);
+    public void AddDeclaration(DeclarationNode declaration) => _declarations.Add(declaration);
 }

@@ -1,7 +1,5 @@
-﻿using System.Text;
-using Byl.Core.AST.Nodes.Expression;
+﻿using Byl.Core.AST.Nodes.Expression;
 using Byl.Core.Lexer;
-using Byl.Core.Parser.Utils;
 
 namespace Byl.Core.Parser.Parsers;
 
@@ -129,6 +127,14 @@ public class ExpressionParser(Parser parser)
         if (_parser.Match(TokenType.Identifier))
         {
             var token = _parser.Advance();
+
+            // Если после идентификатора идет '(', то это вызов функции
+            if (_parser.Match(TokenType.LParen))
+            {
+                return ParseFunctionCall(token.Value);
+            }
+
+            // Иначе это переменная
             return new VariableExpression(token.Value, token.Line);
         }
 
@@ -140,6 +146,7 @@ public class ExpressionParser(Parser parser)
 
         if (_parser.Match(TokenType.LParen))
         {
+            _parser.Advance(); // Пропускаем '('
             var expr = Parse();
             _parser.Consume(TokenType.RParen, "Ожидалось ')'");
             return expr;
@@ -160,5 +167,25 @@ public class ExpressionParser(Parser parser)
         // Просто возвращаем литерал с сырым текстом
         // Кодогенератор будет обрабатывать интерполяцию
         return new LiteralExpression(token.Value, token.Line);
+    }
+
+    private FunctionCallExpression ParseFunctionCall(string functionName)
+    {
+        _parser.Consume(TokenType.LParen, "Ожидалось '(' после имени функции");
+
+        var arguments = new List<ExpressionNode>();
+
+        // Парсим аргументы, если они есть
+        if (!_parser.Match(TokenType.RParen))
+        {
+            do
+            {
+                arguments.Add(Parse());
+            }
+            while (_parser.Match(TokenType.Comma) && _parser.Advance() != null);
+        }
+
+        _parser.Consume(TokenType.RParen, "Ожидалось ')' после аргументов");
+        return new FunctionCallExpression(functionName, arguments, _parser.Current.Line);
     }
 }

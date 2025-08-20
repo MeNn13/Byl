@@ -9,6 +9,12 @@ namespace Byl.Core.AST.Visitors;
 
 public class CodeGenerator : IAstVisitor<string>
 {
+    private readonly Dictionary<string, string> _importedNamespaces = new();
+    private string _currentNamespacePrefix = "";
+    private readonly StringBuilder _functionDeclarations = new();
+    private readonly StringBuilder _mainCode = new();
+    private readonly Dictionary<string, string> _functionPrefixes = new();
+
     public string Visit(TypeNode node)
     {
         throw new NotImplementedException();
@@ -17,30 +23,82 @@ public class CodeGenerator : IAstVisitor<string>
     {
         var sb = new StringBuilder();
         sb.AppendLine("#include <stdio.h>");
-        sb.AppendLine("int main() {");
+        sb.AppendLine("#include <string.h>");
+        sb.AppendLine();
 
-        // Ищем главную функцию
-        var mainFunc = node.Functions.FirstOrDefault(f => f.Name == "главный");
-        if (mainFunc != null)
+        // Собираем импорты и запоминаем префиксы
+        foreach (var declaration in node.Declarations.OfType<ImportDeclaration>())
         {
-            sb.Append(mainFunc.Body.Accept(this));
+            string prefix = GenerateNamespacePrefix(declaration.Namespace);
+            _importedNamespaces[declaration.Namespace] = prefix;
         }
 
-        sb.AppendLine("    return 0;");
-        sb.AppendLine("}");
+        // Генерируем объявления функций
+        foreach (var declaration in node.Declarations.OfType<NamespaceDeclaration>())
+        {
+            _functionDeclarations.Append(declaration.Accept(this));
+        }
+
+        // Генерируем главную функцию
+        var mainFunc = node.Declarations.OfType<FunctionDeclaration>()
+            .FirstOrDefault(f => f.Name == "главный");
+
+        if (mainFunc != null)
+        {
+            _mainCode.AppendLine("int main() {");
+            _mainCode.Append(mainFunc.Body.Accept(this));
+            _mainCode.AppendLine("    return 0;");
+            _mainCode.AppendLine("}");
+        }
+
+        // Собираем итоговый код
+        sb.Append(_functionDeclarations);
+        sb.AppendLine();
+        sb.Append(_mainCode);
+
         return sb.ToString();
+    }
+    public string Visit(NamespaceDeclaration node)
+    {
+        var oldPrefix = _currentNamespacePrefix;
+        _currentNamespacePrefix = GenerateNamespacePrefix(node.Name);
+
+        var code = new StringBuilder();
+        foreach (var member in node.Members)
+        {
+            code.Append(member.Accept(this));
+        }
+
+        _currentNamespacePrefix = oldPrefix;
+        return code.ToString();
+    }
+    public string Visit(ImportDeclaration node)
+    {
+        return string.Empty; // Импорты не генерируют код
     }
     public string Visit(FunctionDeclaration node)
     {
+        var functionName = _currentNamespacePrefix + node.Name;
+
+        // Запоминаем префикс для этой функции
+        _functionPrefixes[node.Name] = _currentNamespacePrefix;
+
+        var returnType = GetCType(node.ReturnType);
+
         var sb = new StringBuilder();
+        sb.Append($"{returnType} {functionName}(");
 
-        // Генерируем сигнатуру функции на C
-        sb.AppendLine($"void {node.Name}() {{");
+        for (int i = 0; i < node.Parameters.Count; i++)
+        {
+            if (i > 0) sb.Append(", ");
+            sb.Append($"{GetCType(node.Parameters[i].Type)} {node.Parameters[i].Name}");
+        }
 
-        // Генерируем тело функции
+        sb.AppendLine(") {");
         sb.Append(node.Body.Accept(this));
-
         sb.AppendLine("}");
+        sb.AppendLine();
+
         return sb.ToString();
     }
     public string Visit(ParameterNode node)
@@ -58,6 +116,12 @@ public class CodeGenerator : IAstVisitor<string>
     }
     public string Visit(PrintStatement node)
     {
+        // Если выражение - вызов функции, обрабатываем особо
+        if (node.Expression is FunctionCallExpression funcCall)
+        {
+            return $"    printf(\"%d\\n\", {funcCall.Accept(this)});\n";
+        }
+
         return $"    printf(\"%d\\n\", {node.Expression.Accept(this)});\n";
     }
     public string Visit(AssignStatement node)
@@ -90,6 +154,11 @@ public class CodeGenerator : IAstVisitor<string>
     }
     public string Visit(ReturnStatement node)
     {
+        if (node.Value is FunctionCallExpression funcCall)
+        {
+            return $"    return {funcCall.Accept(this)};\n";
+        }
+
         return node.Value != null
             ? $"    return {node.Value.Accept(this)};\n"
             : "    return;\n";
@@ -134,6 +203,10 @@ public class CodeGenerator : IAstVisitor<string>
     }
     public string Visit(VariableExpression node)
     {
+        // Для переменных из импортированных пространств добавляем префикс
+        // В кодогенераторе мы не имеем доступа к символьной таблице,
+        // поэтому просто возвращаем имя переменной
+        // Префиксы добавляются на уровне вызовов функций
         return node.Name;
     }
     public string Visit(UnaryExpression node)
@@ -151,6 +224,24 @@ public class CodeGenerator : IAstVisitor<string>
         // Этот метод больше не используется
         // Интерполированные строки теперь обрабатываются как LiteralExpression
         return "\"Интерполяция обрабатывается в LiteralExpression\\n\"";
+    }
+    public string Visit(ExpressionStatement node)
+    {
+        if (node.Expression is FunctionCallExpression funcCall)
+        {
+            return $"    {funcCall.Accept(this)};\n";
+        }
+
+        return $"    {node.Expression.Accept(this)};\n";
+    }
+    public string Visit(FunctionCallExpression node)
+    {
+        var args = string.Join(", ", node.Arguments.Select(arg => arg.Accept(this)));
+
+        // Определяем полное имя функции с префиксом пространства имен
+        string fullFunctionName = GetFullFunctionName(node.FunctionName);
+
+        return $"{fullFunctionName}({args})";
     }
 
     private string EscapeString(string str)
@@ -221,5 +312,44 @@ public class CodeGenerator : IAstVisitor<string>
         {
             return $"printf({formatString})";
         }
+    }
+    private string GenerateNamespacePrefix(string namespaceName)
+    {
+        return namespaceName.Replace("::", "_") + "_";
+    }
+    private string GetCType(TypeNode? typeNode)
+    {
+        if (typeNode == null) return "void";
+
+        return typeNode.TypeName switch
+        {
+            "цел" => "int",
+            "вещ" => "float",
+            "лог" => "int",
+            "стр" => "char*",
+            _ => "int"
+        };
+    }
+    private string GetFullFunctionName(string functionName)
+    {
+        // Если это главная функция, возвращаем как есть
+        if (functionName == "главный")
+            return functionName;
+
+        // Если функция определена в текущем пространстве имен
+        if (_functionPrefixes.TryGetValue(functionName, out var prefix) && !string.IsNullOrEmpty(prefix))
+        {
+            return prefix + functionName;
+        }
+
+        // Ищем в импортированных пространствах
+        foreach (var import in _importedNamespaces)
+        {
+            // Предполагаем, что импортированные функции имеют префикс
+            return import.Value + functionName;
+        }
+
+        // Если не нашли, возвращаем как есть (глобальная функция)
+        return functionName;
     }
 }
