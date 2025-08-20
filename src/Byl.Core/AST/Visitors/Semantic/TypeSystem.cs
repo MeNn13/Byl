@@ -14,12 +14,12 @@ internal class TypeSystem
         ["общ"] = ["цел", "лог", "стр", "общ"],
         ["цел"] = ["цел", "общ"],
         ["лог"] = ["лог", "общ"],
-        ["стр"] = ["стр", "общ"]
+        ["стр"] = ["стр", "общ", "цел", "лог"]
     };
 
     public static readonly Dictionary<TokenType, string[]> AllowedOperations = new()
     {
-        [TokenType.Plus] = ["цел", "стр", "общ"],
+        [TokenType.Plus] = ["цел", "стр", "общ", "лог"],
         [TokenType.Minus] = ["цел", "общ"],
         [TokenType.Multiply] = ["цел", "общ"],
         [TokenType.Divide] = ["цел", "общ"],
@@ -47,6 +47,13 @@ internal class TypeSystem
         if (!AreTypesCompatible(leftType, rightType))
             return "несовместимо";
 
+        // Для конкатенации строк
+        if (operation == TokenType.Plus)
+        {
+            if (leftType == "стр" || rightType == "стр")
+                return "стр";
+        }
+
         // Для арифметических операций
         if (operation is TokenType.Plus or TokenType.Minus or
             TokenType.Multiply or TokenType.Divide)
@@ -70,5 +77,16 @@ internal class TypeSystem
         }
 
         return "общ";
+    }
+
+    public static bool IsStringOperationAllowed(TokenType operation, string leftType, string rightType)
+    {
+        if (operation == TokenType.Plus)
+        {
+            // Конкатенация разрешена между строками и любыми другими типами
+            return leftType == "стр" || rightType == "стр";
+        }
+
+        return IsOperationAllowed(operation, leftType) && IsOperationAllowed(operation, rightType);
     }
 }

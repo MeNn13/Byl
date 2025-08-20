@@ -1,5 +1,7 @@
-﻿using Byl.Core.AST.Nodes.Expression;
+﻿using System.Text;
+using Byl.Core.AST.Nodes.Expression;
 using Byl.Core.Lexer;
+using Byl.Core.Parser.Utils;
 
 namespace Byl.Core.Parser.Parsers;
 
@@ -143,6 +145,20 @@ public class ExpressionParser(Parser parser)
             return expr;
         }
 
+        if (_parser.Match(TokenType.InterpolatedString))
+        {
+            return ParseInterpolatedString();
+        }
+
         throw _parser.UnexpectedToken(_parser.Current);
+    }
+
+    private ExpressionNode ParseInterpolatedString()
+    {
+        var token = _parser.Advance();
+
+        // Просто возвращаем литерал с сырым текстом
+        // Кодогенератор будет обрабатывать интерполяцию
+        return new LiteralExpression(token.Value, token.Line);
     }
 }

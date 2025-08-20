@@ -1,17 +1,19 @@
 ﻿using Byl.Core.AST.Nodes;
-using Byl.Core.AST.Nodes.Declaration;
 using Byl.Core.AST.Nodes.Expression;
-using Byl.Core.AST.Nodes.Statement;
 using Byl.Core.Lexer;
 
-namespace Byl.Core.AST.Visitors.Optimize;
+namespace Byl.Core.AST.Visitors.Optimizers;
 
-public class ConstantFolder : IAstVisitor<ExpressionNode>
+internal class ConstantFoldingOptimizer : BaseOptimizer
 {
-    public ExpressionNode Visit(BinaryExpression node)
+    public override string Name => "Constant Folding";
+
+    public override bool CanOptimize(Node node) => node is ExpressionNode;
+
+    protected override Node VisitBinary(BinaryExpression node)
     {
-        var left = node.Left.Accept(this);
-        var right = node.Right.Accept(this);
+        var left = (ExpressionNode)Visit(node.Left);
+        var right = (ExpressionNode)Visit(node.Right);
 
         // Оптимизация: 0 + x → x
         if (node.Operator.Type == TokenType.Plus && left is LiteralExpression { Value: 0 })
@@ -83,11 +85,9 @@ public class ConstantFolder : IAstVisitor<ExpressionNode>
         // Если не удалось свернуть, возвращаем оптимизированные подвыражения
         return new BinaryExpression(left, node.Operator, right, node.Line);
     }
-    public ExpressionNode Visit(LiteralExpression node) => node;
-    public ExpressionNode Visit(VariableExpression node) => node;
-    public ExpressionNode Visit(UnaryExpression node)
+    protected override Node VisitUnary(UnaryExpression node)
     {
-        var right = node.Right.Accept(this);
+        var right = (ExpressionNode)Visit(node.Right);
 
         // Сворачиваем унарные операции с литералами
         if (right is LiteralExpression rightLit)
@@ -121,15 +121,4 @@ public class ConstantFolder : IAstVisitor<ExpressionNode>
         return new UnaryExpression(node.Operator, right, node.Line);
     }
 
-    public ExpressionNode Visit(TypeNode node) => throw new InvalidOperationException();
-    public ExpressionNode Visit(ProgramNode node) => throw new InvalidOperationException();
-    public ExpressionNode Visit(FunctionDeclaration node) => throw new InvalidOperationException();
-    public ExpressionNode Visit(ParameterNode node) => throw new InvalidOperationException();
-    public ExpressionNode Visit(BlockStatement node) => throw new InvalidOperationException();
-    public ExpressionNode Visit(PrintStatement node) => throw new InvalidOperationException();
-    public ExpressionNode Visit(AssignStatement node) => throw new InvalidOperationException();
-    public ExpressionNode Visit(IfStatement node) => throw new InvalidOperationException();
-    public ExpressionNode Visit(WhileStatement node) => throw new InvalidOperationException();
-    public ExpressionNode Visit(ReturnStatement node) => throw new InvalidOperationException();
-    public ExpressionNode Visit(VariableDeclarationStatement node) => throw new InvalidOperationException();
 }

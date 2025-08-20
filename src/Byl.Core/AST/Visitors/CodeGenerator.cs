@@ -118,6 +118,18 @@ public class CodeGenerator : IAstVisitor<string>
     }
     public string Visit(LiteralExpression node)
     {
+        if (node.Value is string str && str.StartsWith("%\""))
+        {
+            // Это интерполированная строка - обрабатываем специально
+            return ProcessInterpolatedString(str);
+        }
+
+        // Для обычных строк экранируем кавычки
+        if (node.Value is string regularStr)
+        {
+            return $"\"{EscapeString(regularStr)}\"";
+        }
+
         return node.Value.ToString()?.ToLower() ?? "0";
     }
     public string Visit(VariableExpression node)
@@ -133,5 +145,81 @@ public class CodeGenerator : IAstVisitor<string>
             TokenType.Not => $"(!{right})",
             _ => $"({node.Operator.Value}{right})"
         };
+    }
+    public string Visit(InterpolatedStringExpression node)
+    {
+        // Этот метод больше не используется
+        // Интерполированные строки теперь обрабатываются как LiteralExpression
+        return "\"Интерполяция обрабатывается в LiteralExpression\\n\"";
+    }
+
+    private string EscapeString(string str)
+    {
+        return str.Replace("\\", "\\\\")
+                  .Replace("\"", "\\\"")
+                  .Replace("\n", "\\n")
+                  .Replace("\t", "\\t")
+                  .Replace("\r", "\\r")
+                  .Replace("%", "%%");
+    }
+    private string ProcessInterpolatedString(string interpolatedStr)
+    {
+        // Убираем %" и закрывающую "
+        var content = interpolatedStr.Substring(2, interpolatedStr.Length - 3);
+
+        var formatParts = new List<string>();
+        var args = new List<string>();
+        var currentText = new StringBuilder();
+        var inExpression = false;
+
+        formatParts.Add("\"");
+
+        for (int i = 0; i < content.Length; i++)
+        {
+            if (content[i] == '{' && !inExpression)
+            {
+                // Начало выражения
+                if (currentText.Length > 0)
+                {
+                    formatParts.Add(EscapeString(currentText.ToString()));
+                    currentText.Clear();
+                }
+                inExpression = true;
+            }
+            else if (content[i] == '}' && inExpression)
+            {
+                // Конец выражения
+                if (currentText.Length > 0)
+                {
+                    formatParts.Add("%d"); // Для чисел
+                    args.Add(currentText.ToString()); // Имя переменной
+                    currentText.Clear();
+                }
+                inExpression = false;
+            }
+            else
+            {
+                currentText.Append(content[i]);
+            }
+        }
+
+        // Добавляем оставшийся текст
+        if (currentText.Length > 0 && !inExpression)
+        {
+            formatParts.Add(EscapeString(currentText.ToString()));
+        }
+
+        formatParts.Add("\\n\"");
+
+        var formatString = string.Join("", formatParts);
+
+        if (args.Count > 0)
+        {
+            return $"printf({formatString}, {string.Join(", ", args)})";
+        }
+        else
+        {
+            return $"printf({formatString})";
+        }
     }
 }
