@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "Byl.CLI": {
+      "commandName": "Project",
+      "commandLineArgs": "Test.byl"
+    },
+    "WSL": {
+      "commandName": "WSL2",
+      "distributionName": ""
+    }
+  }
+}

@@ -13,6 +13,27 @@ public class ConstantFolder : IAstVisitor<ExpressionNode>
         var left = node.Left.Accept(this);
         var right = node.Right.Accept(this);
 
+        // Оптимизация: 0 + x → x
+        if (node.Operator.Type == TokenType.Plus && left is LiteralExpression { Value: 0 })
+            return right;
+
+        // Оптимизация: x + 0 → x  
+        if (node.Operator.Type == TokenType.Plus && right is LiteralExpression { Value: 0 })
+            return left;
+
+        // Оптимизация: 1 * x → x
+        if (node.Operator.Type == TokenType.Multiply && left is LiteralExpression { Value: 1 })
+            return right;
+
+        // Оптимизация: x * 1 → x
+        if (node.Operator.Type == TokenType.Multiply && right is LiteralExpression { Value: 1 })
+            return left;
+
+        // Оптимизация: 0 * x → 0
+        if (node.Operator.Type == TokenType.Multiply &&
+            (left is LiteralExpression { Value: 0 } || right is LiteralExpression { Value: 0 }))
+            return new LiteralExpression(0, node.Line);
+
         // Сворачиваем константы для целых чисел
         if (left is LiteralExpression lLit && right is LiteralExpression rLit)
         {
@@ -30,9 +51,6 @@ public class ConstantFolder : IAstVisitor<ExpressionNode>
                         TokenType.NotEqual => lInt != rInt ? 1 : 0,
                         TokenType.GreaterThan => lInt > rInt ? 1 : 0,
                         TokenType.LessThan => lInt < rInt ? 1 : 0,
-                        // Добавляем если есть:
-                        // TokenType.GreaterEqual => lInt >= rInt ? 1 : 0,
-                        // TokenType.LessEqual => lInt <= rInt ? 1 : 0,
                         _ => null
                     };
 
@@ -102,7 +120,6 @@ public class ConstantFolder : IAstVisitor<ExpressionNode>
 
         return new UnaryExpression(node.Operator, right, node.Line);
     }
-
 
     public ExpressionNode Visit(TypeNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(ProgramNode node) => throw new InvalidOperationException();

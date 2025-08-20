@@ -25,11 +25,16 @@ public class KeywordMatcher : ITokenMatcher
 
     public Token? Match(LexerContext ctx)
     {
-        if (!char.IsLetter(ctx.Current)) return null;
+        // РАЗРЕШАЕМ КИРИЛЛИЧЕСКИЕ БУКВЫ!
+        if (!char.IsLetter(ctx.Current) && !(ctx.Current > 127)) return null;
 
         int start = ctx.Position;
+
+        // РАЗРЕШАЕМ КИРИЛЛИЧЕСКИЕ БУКВЫ В ИДЕНТИФИКАТОРАХ!
         while (ctx.Position < ctx.Code.Length &&
-              (char.IsLetterOrDigit(ctx.Current) || ctx.Current == '_'))
+              (char.IsLetterOrDigit(ctx.Current) ||
+               ctx.Current == '_' ||
+               ctx.Current > 127)) // ← ВАЖНО: разрешаем Unicode символы
         {
             ctx.Position++;
         }
@@ -39,6 +44,5 @@ public class KeywordMatcher : ITokenMatcher
         return Keywords.TryGetValue(text, out var type)
             ? new Token(type, text, ctx.Line)
             : new Token(TokenType.Identifier, text, ctx.Line);
-
     }
 }

@@ -58,33 +58,32 @@ public class ExpressionParser(Parser parser)
     // Равенство (!=, ==)
     private ExpressionNode ParseEquality()
     {
-        var expr = ParseAdditive();
+        var expr = ParseComparison();
 
         while (_parser.Match(TokenType.NotEqual, TokenType.Equal))
         {
             var op = _parser.Advance();
-            var right = ParseAdditive();
-            return new BinaryExpression(expr, op, right, op.Line);
+            var right = ParseComparison();
+            expr = new BinaryExpression(expr, op, right, op.Line);
         }
 
         return expr;
     }
 
-    //// Сравнения (<, >, <=, >=)
-    //private ExpressionNode ParseComparison()
-    //{
-    //    var expr = ParseAdditive();
+    // Сравнения (<, >, <=, >=)
+    private ExpressionNode ParseComparison()
+    {
+        var expr = ParseAdditive();
 
-    //    while (_parser.Match(TokenType.Less, TokenType.Greater,
-    //                       TokenType.LessEqual, TokenType.GreaterEqual))
-    //    {
-    //        var op = _parser.Current;
-    //        var right = ParseAdditive();
-    //        return new BinaryExpression(expr, op, right, op.Line);
-    //    }
+        while (_parser.Match(TokenType.LessThan, TokenType.GreaterThan))
+        {
+            var op = _parser.Advance();
+            var right = ParseAdditive();
+            expr = new BinaryExpression(expr, op, right, op.Line);
+        }
 
-    //    return expr;
-    //}
+        return expr;
+    }
 
     // Сложение/вычитание
     private ExpressionNode ParseAdditive()
@@ -116,24 +115,6 @@ public class ExpressionParser(Parser parser)
         return expr;
     }
 
-    // Унарные операции (-, !)
-    //private ExpressionNode ParseUnary()
-    //{
-    //    if (_parser.Match(TokenType.Minus, TokenType.Not))
-    //    {
-    //        var op = _parser.Current;
-    //        var right = ParseUnary();
-    //        return new UnaryExpression
-    //        {
-    //            Operator = op,
-    //            Right = right,
-    //            Line = op.Line
-    //        };
-    //    }
-
-    //    return ParsePrimary();
-    //}
-
     // Базовые элементы
     private ExpressionNode ParsePrimary()
     {
@@ -147,6 +128,12 @@ public class ExpressionParser(Parser parser)
         {
             var token = _parser.Advance();
             return new VariableExpression(token.Value, token.Line);
+        }
+
+        if (_parser.Match(TokenType.StringLiteral))
+        {
+            var token = _parser.Advance();
+            return new LiteralExpression(token.Value, token.Line);
         }
 
         if (_parser.Match(TokenType.LParen))

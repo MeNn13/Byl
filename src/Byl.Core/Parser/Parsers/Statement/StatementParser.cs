@@ -12,6 +12,7 @@ public class StatementParser(Parser parser)
         new PrintStatementParser(parser),
         new AssignmentStatementParser(parser),
         new IfStatementParser(parser),
+        new VariableDeclarationParser(parser),
         new WhileStatementParser(parser),
         new ReturnStatementParser(parser)
        ];
