@@ -125,8 +125,18 @@ public class SemanticAnalyzer : IAstVisitor<SemanticResult>
         var leftType = GetExpressionType(node.Left);
         var rightType = GetExpressionType(node.Right);
 
-        if (leftType == null || rightType == null)
+        if (leftType is null || rightType is null)
             return SemanticResult.Error("Не удалось определить тип выражения");
+
+        // Специальная проверка для конкатенации строк
+        if (node.Operator.Type == TokenType.Plus)
+        {
+            if ((leftType == "стр" || rightType == "стр") &&
+                TypeSystem.AreTypesCompatible(leftType, rightType))
+            {
+                return SemanticResult.Success();
+            }
+        }
 
         if (!TypeSystem.AreTypesCompatible(leftType, rightType))
             return SemanticResult.Error($"Несовместимые типы: {leftType} и {rightType}");
@@ -241,18 +251,28 @@ public class SemanticAnalyzer : IAstVisitor<SemanticResult>
 
         return node.Right.Accept(this);
     }
-
-    private string? GetExpressionType(ExpressionNode expr)
+    public SemanticResult Visit(InterpolatedStringExpression node)
     {
-        return expr switch
+        // Проверяем все части интерполированной строки
+        foreach (var part in node.Parts)
         {
-            LiteralExpression lit => GetLiteralType(lit),
-            VariableExpression varExpr => GetVariableType(varExpr),
-            BinaryExpression binExpr => GetBinaryExpressionType(binExpr),
-            UnaryExpression unExpr => GetUnaryExpressionType(unExpr),
-            _ => null
-        };
+            var partResult = part.Accept(this);
+            if (!partResult.IsValid)
+                return partResult;
+        }
+
+        return SemanticResult.Success();
     }
+
+    private string? GetExpressionType(ExpressionNode expr) => expr switch
+    {
+        LiteralExpression lit => GetLiteralType(lit),
+        VariableExpression varExpr => GetVariableType(varExpr),
+        BinaryExpression binExpr => GetBinaryExpressionType(binExpr),
+        UnaryExpression unExpr => GetUnaryExpressionType(unExpr),
+        InterpolatedStringExpression => "стр",
+        _ => null
+    };
     private string GetLiteralType(LiteralExpression lit) => lit.Value switch
     {
         int => "цел",

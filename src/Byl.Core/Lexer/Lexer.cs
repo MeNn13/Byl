@@ -65,7 +65,6 @@ public class Lexer
             var field = typeof(TokenType).GetField(type.ToString());
             if (field is null) continue;
 
-            // Многознаковые операторы (MultiAttribute) - ВЫСОКИЙ ПРИОРИТЕТ
             var multiAttr = field.GetCustomAttribute<MultiCharAttribute>();
             if (multiAttr is not null)
             {
@@ -73,7 +72,6 @@ public class Lexer
                 continue;
             }
 
-            // Одиночные символы (CharAttribute) - СРЕДНИЙ ПРИОРИТЕТ
             var charAttr = field.GetCustomAttribute<CharAttribute>();
             if (charAttr is not null)
             {
@@ -81,7 +79,6 @@ public class Lexer
                 continue;
             }
 
-            // Ключевые слова (KeywordAttribute) - НИЗКИЙ ПРИОРИТЕТ
             var keywordAttr = field.GetCustomAttribute<KeywordAttribute>();
             if (keywordAttr is not null)
             {
@@ -92,6 +89,7 @@ public class Lexer
 
         // Специальные матчеры
         matchers.Add(new NumberMatcher());
+        matchers.Add(new InterpolatedStringMatcher());
         matchers.Add(new StringMatcher());
         matchers.Add(new CommentMatcher());
 

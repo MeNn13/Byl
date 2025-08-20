@@ -30,4 +30,5 @@ public interface IAstVisitor<TResult>
     TResult Visit(LiteralExpression node);
     TResult Visit(VariableExpression node);
     TResult Visit(Nodes.Expression.UnaryExpression node);
+    TResult Visit(InterpolatedStringExpression node);
 }

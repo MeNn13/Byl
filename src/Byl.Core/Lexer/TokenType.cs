@@ -89,7 +89,7 @@ public enum TokenType
     #endregion
 
     #region Block
-
+    [MultiChar("%\"")] InterpolatedString,
     [Char('(')] LParen,
     [Char(')')] RParen,
     [Char('{')] LBrace,
