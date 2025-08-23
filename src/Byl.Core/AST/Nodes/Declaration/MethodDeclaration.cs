@@ -2,18 +2,20 @@
 
 namespace Byl.Core.AST.Nodes.Declaration;
 
-public class FunctionDeclaration : DeclarationNode
+public class MethodDeclaration : DeclarationNode
 {
+    public string AccessModifier { get; }
     public bool IsStatic { get; }
     public TypeNode? ReturnType { get; }
     public string Name { get; }
     public List<ParameterNode> Parameters { get; }
     public BlockStatement Body { get; }
 
-    public FunctionDeclaration(bool isStatic,
+    public MethodDeclaration(string accessModifier, 
+        bool isStatic,
         TypeNode? returnType,
         string name,
-        List<ParameterNode> parameters, 
+        List<ParameterNode> parameters,
         BlockStatement body,
         int line) : base(line)
     {
@@ -22,6 +24,7 @@ public class FunctionDeclaration : DeclarationNode
         Parameters = parameters;
         Body = body;
         ReturnType = returnType;
+        AccessModifier = accessModifier;
     }
 
     public override TResult Accept<TResult>(IAstVisitor<TResult> visitor) =>

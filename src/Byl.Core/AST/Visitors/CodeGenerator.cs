@@ -40,7 +40,7 @@ public class CodeGenerator : IAstVisitor<string>
         }
 
         // Генерируем главную функцию
-        var mainFunc = node.Declarations.OfType<FunctionDeclaration>()
+        var mainFunc = node.Declarations.OfType<MethodDeclaration>()
             .FirstOrDefault(f => f.Name == "главный");
 
         if (mainFunc != null)
@@ -76,7 +76,7 @@ public class CodeGenerator : IAstVisitor<string>
     {
         return string.Empty; // Импорты не генерируют код
     }
-    public string Visit(FunctionDeclaration node)
+    public string Visit(MethodDeclaration node)
     {
         var functionName = Transliterate(node.Name); // Транслитерируем имя функции
         var fullFunctionName = _currentNamespacePrefix + functionName;

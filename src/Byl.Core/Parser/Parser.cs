@@ -13,7 +13,6 @@ public class Parser
     private int _position;
     internal Token Current => _tokens[_position];
     internal Token LastToken => _tokens[^1];
-    internal Token? Peek() => _position + 1 < _tokens.Count ? _tokens[_position + 1] : null;
     internal bool IsAtEnd => _position >= _tokens.Count;
 
     public Parser(List<Token> tokens)
@@ -34,6 +33,31 @@ public class Parser
 
         return program;
     }
+
+    internal bool Match(params TokenType[] types)
+        => types.Any(t => Current.Type == t);
+    internal Token Consume(TokenType type, string errorMessage)
+    {
+        if (Current.Type == type)
+            return Advance();
+        throw new ParserException(errorMessage, Current.Line);
+    }
+    internal Token? Peek(int count = 1) =>
+        _position + count < _tokens.Count ? _tokens[_position + count] : null;
+    internal Token Advance()
+    {
+        if (!IsAtEnd) _position++;
+        return _tokens[_position - 1];
+    }
+    internal ParserException UnexpectedToken(Token token) =>
+        new($"Неожиданный токен: {token.Type} '{token.Value}'", token.Line);
+    internal bool IsTypeToken(TokenType type) => type switch
+    {
+        TokenType.VarType or TokenType.IntType or
+        TokenType.StringType or TokenType.BoolType => true,
+        _ => false
+    };
+
     private DeclarationNode ParseDeclaration()
     {
         if (Match(TokenType.Namespace))
@@ -42,55 +66,9 @@ public class Parser
         if (Match(TokenType.Import))
             return new ImportParser(this).Parse();
 
-        if (Match(TokenType.Static)) // Добавляем поддержку static
-            return ParseStaticFunction();
-
-        if (IsTypeToken(Current.Type) || Match(TokenType.Main, TokenType.Function))
-            return new FunctionParser(this).Parse();
+        if (Match(TokenType.Class))
+            return new ClassParser(this).Parse();
 
         throw UnexpectedToken(Current);
     }
-
-    private FunctionDeclaration ParseStaticFunction()
-    {
-        var staticToken = Advance(); // Пропускаем 'static'
-
-        // Парсим остальную часть функции как обычную функцию
-        var function = new FunctionParser(this).Parse();
-
-        // Устанавливаем флаг static
-        return new FunctionDeclaration(
-            function.IsStatic,
-            function.ReturnType,
-            function.Name,
-            function.Parameters,
-            function.Body,
-            staticToken.Line
-        );
-    }
-
-    internal bool Match(params TokenType[] types)
-        => types.Any(t => Current.Type == t);
-
-    internal Token Consume(TokenType type, string errorMessage)
-    {
-        if (Current.Type == type)
-            return Advance();
-        throw new ParserException(errorMessage, Current.Line);
-    }
-
-    internal Token Advance()
-    {
-        if (!IsAtEnd) _position++;
-        return _tokens[_position - 1];
-    }
-    internal ParserException UnexpectedToken(Token token) =>
-        new($"Неожиданный токен: {token.Type} '{token.Value}'", token.Line);
-
-    internal bool IsTypeToken(TokenType type) => type switch
-    {
-        TokenType.VarType or TokenType.IntType or
-        TokenType.StringType or TokenType.BoolType => true,
-        _ => false
-    };
 }

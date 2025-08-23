@@ -10,10 +10,6 @@ public enum TokenType
     [TokenMatcher(typeof(KeywordMatcher))]
     Main = 1,
 
-    [Keyword("функция")] 
-    [TokenMatcher(typeof(KeywordMatcher))]
-    Function,
-
     [Keyword("печать")]
     [TokenMatcher(typeof(KeywordMatcher))]
     Print,
@@ -53,6 +49,18 @@ public enum TokenType
     [TokenMatcher(typeof(KeywordMatcher))]
     Class,
 
+    [Keyword("новый")]
+    [TokenMatcher(typeof(KeywordMatcher))]
+    New,
+
+    [Keyword("родитель")]
+    [TokenMatcher(typeof(KeywordMatcher))]
+    Base,
+
+    [Keyword("Конструктор")]
+    [TokenMatcher(typeof(KeywordMatcher))]
+    Constructor,
+
     [Keyword("импорт")]
     [TokenMatcher(typeof(KeywordMatcher))]
     Import,
@@ -62,6 +70,20 @@ public enum TokenType
 
     [MultiChar("::")]
     NamespaceSeparator,
+    #endregion
+
+    #region Modifire of Access
+    [Keyword("публичный")]
+    [TokenMatcher(typeof(KeywordMatcher))]
+    Public,
+
+    [Keyword("приватный")]
+    [TokenMatcher(typeof(KeywordMatcher))]
+    Private,
+
+    [Keyword("защищенный")]
+    [TokenMatcher(typeof(KeywordMatcher))]
+    Protected,
     #endregion
 
     #region Type

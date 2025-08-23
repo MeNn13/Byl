@@ -43,22 +43,22 @@ public class NamespaceParser(Parser parser)
             return ParseStaticFunction();
         }
 
-        if (_parser.IsTypeToken(_parser.Current.Type) || _parser.Match(TokenType.Function))
+        if (_parser.IsTypeToken(_parser.Current.Type) || _parser.Match(TokenType.Method))
         {
-            return new FunctionParser(_parser).Parse();
+            return new MethodParser(_parser).Parse();
         }
 
         throw _parser.UnexpectedToken(_parser.Current);
     }
 
-    private FunctionDeclaration ParseStaticFunction()
+    private MethodDeclaration ParseStaticFunction()
     {
         var staticToken = _parser.Advance(); // Пропускаем 'static'
 
         // Парсим остальную часть функции
-        var function = new FunctionParser(_parser).Parse();
+        var function = new MethodParser(_parser).Parse();
 
-        return new FunctionDeclaration(
+        return new MethodDeclaration(
             function.IsStatic,
             function.ReturnType,
             function.Name,

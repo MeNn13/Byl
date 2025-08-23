@@ -6,27 +6,26 @@ namespace Byl.Core.AST.Visitors.Semantic;
 public class NamespaceScope
 {
     public string Name { get; }
-    private readonly Dictionary<string, FunctionDeclaration> _functions = new();
-    private readonly Dictionary<string, VariableSymbol> _variables = new();
+    private readonly Dictionary<string, MethodDeclaration> _methods = [];
+    private readonly Dictionary<string, ClassDeclaration> _classes = [];
 
-    public NamespaceScope(string name)
-    {
-        Name = name;
-    }
+    public NamespaceScope(string name) => Name = name;
 
-    public void AddFunction(FunctionDeclaration func) => _functions[func.Name] = func;
-    public bool TryGetFunction(string name, out FunctionDeclaration func) => _functions.TryGetValue(name, out func);
+    public void AddMethod(MethodDeclaration func) => _methods[func.Name] = func;
+    public void AddClass(ClassDeclaration @class) => _classes[@class.Name] = @class;
 
-    public void AddVariable(VariableSymbol var) => _variables[var.Name] = var;
-    public VariableSymbol? GetVariable(string name) => _variables.GetValueOrDefault(name);
+    public bool TryGetFunction(string name, out MethodDeclaration func) => 
+        _methods.TryGetValue(name, out func);
+    public bool TryGetClass(string name, out ClassDeclaration @class) =>
+        _classes.TryGetValue(name, out @class);
 
     public T? Lookup<T>(string name) where T : class
     {
-        if (typeof(T) == typeof(FunctionDeclaration))
-            return _functions.GetValueOrDefault(name) as T;
+        if (typeof(T) == typeof(MethodDeclaration))
+            return _methods.GetValueOrDefault(name) as T;
 
-        if (typeof(T) == typeof(VariableSymbol))
-            return _variables.GetValueOrDefault(name) as T;
+        if (typeof(T) == typeof(ClassDeclaration))
+            return _classes.GetValueOrDefault(name) as T;
 
         return null;
     }

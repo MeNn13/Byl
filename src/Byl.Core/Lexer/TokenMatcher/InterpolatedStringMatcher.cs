@@ -1,95 +1,94 @@
 ﻿using System.Text;
 
-namespace Byl.Core.Lexer.TokenMatcher
+namespace Byl.Core.Lexer.TokenMatcher;
+
+internal class InterpolatedStringMatcher : ITokenMatcher
 {
-    internal class InterpolatedStringMatcher : ITokenMatcher
+    public int Priority => 15;
+
+    public Token? Match(LexerContext ctx)
     {
-        public int Priority => 15;
-
-        public Token? Match(LexerContext ctx)
+        if (ctx.Current == '%' && ctx.Peek() == '"')
         {
-            if (ctx.Current == '%' && ctx.Peek() == '"')
-            {
-                return MatchInterpolatedString(ctx);
-            }
-            return null;
+            return MatchInterpolatedString(ctx);
         }
+        return null;
+    }
 
-        private Token MatchInterpolatedString(LexerContext context)
+    private Token MatchInterpolatedString(LexerContext context)
+    {
+        var startPos = context.Position;
+        var line = context.Line;
+
+        // Пропускаем %"
+        context.Position += 2;
+
+        var resultText = new StringBuilder();
+        resultText.Append("%\"");
+
+        var currentText = new StringBuilder();
+        var inExpression = false;
+
+        while (context.Position < context.Code.Length)
         {
-            var startPos = context.Position;
-            var line = context.Line;
-
-            // Пропускаем %"
-            context.Position += 2;
-
-            var resultText = new StringBuilder();
-            resultText.Append("%\"");
-
-            var currentText = new StringBuilder();
-            var inExpression = false;
-
-            while (context.Position < context.Code.Length)
+            if (context.Current == '\\') // Escape sequences
             {
-                if (context.Current == '\\') // Escape sequences
+                resultText.Append(context.Current);
+                context.Position++;
+
+                if (context.Position < context.Code.Length)
                 {
                     resultText.Append(context.Current);
                     context.Position++;
+                }
+            }
+            else if (context.Current == '{' && !inExpression)
+            {
+                // Начало выражения - добавляем накопленный текст
+                resultText.Append(currentText);
+                currentText.Clear();
 
-                    if (context.Position < context.Code.Length)
-                    {
-                        resultText.Append(context.Current);
-                        context.Position++;
-                    }
-                }
-                else if (context.Current == '{' && !inExpression)
-                {
-                    // Начало выражения - добавляем накопленный текст
-                    resultText.Append(currentText);
-                    currentText.Clear();
+                resultText.Append('{');
+                inExpression = true;
+                context.Position++;
+            }
+            else if (context.Current == '}' && inExpression)
+            {
+                // Конец выражения
+                resultText.Append(currentText);
+                currentText.Clear();
 
-                    resultText.Append('{');
-                    inExpression = true;
-                    context.Position++;
-                }
-                else if (context.Current == '}' && inExpression)
-                {
-                    // Конец выражения
-                    resultText.Append(currentText);
-                    currentText.Clear();
-
-                    resultText.Append('}');
-                    inExpression = false;
-                    context.Position++;
-                }
-                else if (context.Current == '"' && !inExpression)
-                {
-                    // Конец строки
-                    resultText.Append(currentText);
-                    resultText.Append('"');
-                    context.Position++;
-                    break;
-                }
-                else
-                {
-                    currentText.Append(context.Current);
-                    context.Position++;
-                }
-
-                if (context.Current == '\n') context.Line++;
+                resultText.Append('}');
+                inExpression = false;
+                context.Position++;
+            }
+            else if (context.Current == '"' && !inExpression)
+            {
+                // Конец строки
+                resultText.Append(currentText);
+                resultText.Append('"');
+                context.Position++;
+                break;
+            }
+            else
+            {
+                currentText.Append(context.Current);
+                context.Position++;
             }
 
-            return new Token(TokenType.InterpolatedString, resultText.ToString(), line);
+            if (context.Current == '\n') context.Line++;
         }
 
-        private char ProcessEscape(char c) => c switch
-        {
-            'n' => '\n',
-            't' => '\t',
-            'r' => '\r',
-            '"' => '"',
-            '\\' => '\\',
-            _ => c
-        };
+        return new Token(TokenType.InterpolatedString, resultText.ToString(), line);
     }
+
+    private char ProcessEscape(char c) => c switch
+    {
+        'n' => '\n',
+        't' => '\t',
+        'r' => '\r',
+        '"' => '"',
+        '\\' => '\\',
+        _ => c
+    };
 }
